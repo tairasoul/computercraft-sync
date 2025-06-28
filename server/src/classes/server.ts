@@ -384,7 +384,7 @@ export class SyncServer {
           const requests = data.get(channel)!;
           for (const request of requests) {
             const requestCount = this.requestCount.get(ws)
-            await this.waitForVariableToBe(`request${requestCount + 1}`, () => this.latestMessage.get(ws)!, 1);
+            await this.waitForVariableToBe(`waiting${requestCount + 1}`, () => this.latestMessage.get(ws)!, 1);
             this.requestCount.set(ws, requestCount + 1);
             ws.send(msgpack.encode(request));
           }
