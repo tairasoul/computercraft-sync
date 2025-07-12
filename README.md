@@ -4,6 +4,8 @@ A primarily [cc-tstl-template](https://github.com/MCJack123/cc-tstl-template) or
 
 Made because I didn't want to manually enter everything and the other tools I could find didn't serve the sole purpose of syncing files, instead being either a turtle remote access tool or a turtle emulator.
 
+Heavily biased towards my own usecases, and will likely be missing more general-use QOL features.
+
 project.json structure:
 ```json5
 {
@@ -11,7 +13,12 @@ project.json structure:
     "project": [     // This is where we declare the various channels available to clients.
         {
            "type": "library", // Can be "library" or "script", "library" channels can be requirements for other channels, library or script.
-           "files": ["lib1/test.lua"], // All the files this channel contains. Optional as long as directories is declared.
+           "files": [
+                {
+                    "path": "startups/testlib.lua", // Path to file
+                    "name": "startup.lua" // Resulting path on CC filesystem
+                }
+            ], // All the files this channel contains. Optional as long as directories is declared.
            "channelName": "testlib", // The channel the client has to connect to in order to sync these files.
            "directories": ["lib1/subdir"], // Folders that should be watched for this channel. Optional as long as files is declared.
            "requiredChannels": ["testreq"] // The channels required for this channel to function. Circular dependencies are not handled and should be avoided.
@@ -19,6 +26,7 @@ project.json structure:
     ]
 }
 ```
+Note: Both `files` and `directories` are optional if the channel is a `library` and has `requiredChannels` set. This is for libraries that represent several other libraries joined together.
 
 If you wish to sync multiple channels at once, a single client can request to connect to several channels.
 
@@ -38,7 +46,7 @@ You can configure the server by editing server/config.json.
 {
     "port": 10234, // The port to host the Express server on. If you are connecting to localhost, the address should be localhost:port
     "minify": false, // Should we minify the Lua code sent to the turtle? This is helpful if you wish to save space but will make debugging a pain.
-    "ngrok": false // Should we start up an ngrok tunnel for the TCP port specified? Helpful if you don't have your own domain and wish to sync with a turtle when playing multiplayer.
+    "ngrok": false // Should we start up an ngrok tunnel for the TCP port specified? Helpful if you don't have your own domain and wish to sync with a computer when playing multiplayer.
 }
 ```
 

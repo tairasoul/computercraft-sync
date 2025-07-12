@@ -13,19 +13,32 @@ import * as lua from "luamin";
 
 const luamin = lua.default
 
-type ProjectItem = {
+type File = {
+  path: string;
+  name: string;
+}
+
+type ProjectItemBase = {
   type: "library" | "script";
-  files: string[];
+  files: File[];
   channelName: string;
   requiredChannels?: string[];
   directories?: string[];
 } | {
   type: "library" | "script";
-  files?: string[];
+  files?: File[];
   channelName: string;
   requiredChannels?: string[];
   directories: string[];
 }
+
+type ProjectItemJoiner = {
+  type: "library";
+  channelName: string;
+  requiredChannels: string[];
+}
+
+type ProjectItem = ProjectItemBase | ProjectItemJoiner;
 
 type Project = {
   rootDir: string;
@@ -237,23 +250,23 @@ export class SyncServer {
     return chunks;
 }
 
-  private processFiles(channel: ProjectItem) {
+  private processFiles(channel: ProjectItemBase) {
     const data: SyncRequest[] = [];
     for (const file of channel.files ?? []) {
-      const fdata = fs.readFileSync(path.join(process.cwd(), this.project.rootDir, file), 'utf8');
+      const fdata = fs.readFileSync(path.join(process.cwd(), this.project.rootDir, file.path), 'utf8');
       const processed = this.preprocess(fdata);
       const chunks = this.splitStringIntoChunks(processed, 50 * 1000);
       data.push({
         type: channel.type,
         fileData: chunks[0],
-        filePath: file
+        filePath: file.name
       })
       if (chunks.length > 1) {
         for (let i = 1; i < chunks.length; i++)
           data.push({
             type: "chunk",
             fileData: chunks[i],
-            filePath: file
+            filePath: file.name
           })
       }
       /*data.push({
@@ -307,6 +320,7 @@ export class SyncServer {
 
   private updateFiles() {
     this.fileBuffered.forEach((v, k) => this.files.set(k, v));
+    this.fileBuffered.clear();
   }
 
   private processLibrary(channel: string) {
@@ -319,8 +333,10 @@ export class SyncServer {
         const processed = this.processLibrary(required);
         channelRequests.push(...processed);
       }
-    const files = this.processFiles(pchannel);
-    channelRequests.push(...files)
+    if ("files" in pchannel || "directories" in pchannel) {
+      const files = this.processFiles(pchannel)
+      channelRequests.push(...files)
+    }
     return channelRequests;
   }
 
