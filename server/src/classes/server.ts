@@ -183,7 +183,7 @@ export class SyncServer {
         const requestCount = this.requestCount.get(ws)
         await this.waitForVariableToBe(`waiting${requestCount + 1}`, () => this.latestMessage.get(ws)!, 1);
         this.requestCount.set(ws, requestCount + 1);
-        const data = pako.deflateRaw(msgpack.encode(request));
+        const data = pako.deflateRaw(msgpack.encode(request), { level: 9 });
         ws.send(data);
       }
     }
@@ -408,7 +408,7 @@ export class SyncServer {
             const requestCount = this.requestCount.get(ws)
             await this.waitForVariableToBe(`waiting${requestCount + 1}`, () => this.latestMessage.get(ws)!, 1);
             this.requestCount.set(ws, requestCount + 1);
-            ws.send(pako.deflateRaw(msgpack.encode(request)));
+            ws.send(pako.deflateRaw(msgpack.encode(request), { level: 9 }));
           }
         }
         resolve();
