@@ -1,6 +1,6 @@
 # CC:T Syncing Server
 
-A primarily [cc-tstl-template](https://github.com/MCJack123/cc-tstl-template) oriented CC:T sync server.
+A primarily [TypescriptToLua](https://typescripttolua.github.io/) oriented CC:T sync server.
 
 Made because I didn't want to manually enter everything and the other tools I could find didn't serve the sole purpose of syncing files, instead being either a turtle remote access tool or a turtle emulator.
 
@@ -63,6 +63,10 @@ If running this on the same computer, you can just run `wget http://localhost:10
 To get all available channels, run `sync {host-url}`
 
 To connect to channels, run `sync {host-url} channels`, ex. `sync localhost:10234 testlib1 testlib2`
+
+## Notes
+
+During the sync process, all requires are prefixed with `/` to make it search from the root of the drive. This will break requires that work relatively from the current file.
 
 ## Credits
 
