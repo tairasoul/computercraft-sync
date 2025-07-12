@@ -21,7 +21,8 @@ project.json structure:
             ], // All the files this channel contains. Optional as long as directories is declared.
            "channelName": "testlib", // The channel the client has to connect to in order to sync these files.
            "directories": ["lib1/subdir"], // Folders that should be watched for this channel. Optional as long as files is declared.
-           "requiredChannels": ["testreq"] // The channels required for this channel to function. Circular dependencies are not handled and should be avoided.
+           "requiredChannels": ["testreq"], // The channels required for this channel to function. Circular dependencies are not handled and should be avoided.
+           "minify": true // Optional, if true this channel's contents will be minified (does not apply to required channels)
         }
     ]
 }

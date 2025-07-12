@@ -184,7 +184,7 @@ export class SyncServer {
         for (const file of channel.files ?? []) {
             const fdata = fs.readFileSync(path.join(process.cwd(), this.project.rootDir, file.path), 'utf8');
             const processed = this.preprocess(fdata);
-            const chunks = this.splitStringIntoChunks(processed, 50 * 1000);
+            const chunks = this.splitStringIntoChunks(channel.minify ? luamin.minify(processed) : processed, 50 * 1000);
             data.push({
                 type: channel.type,
                 fileData: chunks[0],
@@ -216,7 +216,7 @@ export class SyncServer {
                 realFiles.push(path.join(directory, file));
                 const fdata = fs.readFileSync(filepath, 'utf8');
                 const processed = this.preprocess(fdata);
-                const chunks = this.splitStringIntoChunks(processed, 50 * 1000);
+                const chunks = this.splitStringIntoChunks(channel.minify ? luamin.minify(processed) : processed, 50 * 1000);
                 data.push({
                     type: channel.type,
                     fileData: chunks[0],
