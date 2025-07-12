@@ -10,6 +10,7 @@ import hash from "hash-it";
 import { WebSocket } from "ws";
 import bundler from "luabundle";
 import * as lua from "luamin";
+import pako from "pako";
 
 const luamin = lua.default
 
@@ -144,15 +145,17 @@ export class SyncServer {
     }, 500)
     this.server.get("/sync.lua", (req, res) => {
       const file = path.join(this.luaRoot, "sync.lua");
-      res.send(bundler.bundle(file, {
+      res.send(luamin.minify(bundler.bundle(file, {
         resolveModule: (modu) => {
           if (modu === "msgpack")
             return path.join(this.luaRoot, "msgpack.lua");
           if (modu === "base64")
             return path.join(this.luaRoot, "base64.lua");
+          if (modu === "libdeflate")
+            return path.join(this.luaRoot, "libdeflate.lua");
         },
         ignoredModuleNames: BuiltinModules
-      }));
+      })));
     })
     this.server.listen(this.port, () => {
       console.log(`hosting sync server on port ${this.port}`);
@@ -178,7 +181,8 @@ export class SyncServer {
         const requestCount = this.requestCount.get(ws)
         await this.waitForVariableToBe(`waiting${requestCount + 1}`, () => this.latestMessage.get(ws)!, 1);
         this.requestCount.set(ws, requestCount + 1);
-        ws.send(msgpack.encode(request));
+        const data = pako.deflateRaw(msgpack.encode(request));
+        ws.send(data);
       }
     }
   }
@@ -402,7 +406,7 @@ export class SyncServer {
             const requestCount = this.requestCount.get(ws)
             await this.waitForVariableToBe(`waiting${requestCount + 1}`, () => this.latestMessage.get(ws)!, 1);
             this.requestCount.set(ws, requestCount + 1);
-            ws.send(msgpack.encode(request));
+            ws.send(pako.deflateRaw(msgpack.encode(request)));
           }
         }
         resolve();

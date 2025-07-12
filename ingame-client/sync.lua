@@ -1,6 +1,7 @@
 local args = arg 
 local msgpack = require("msgpack")
 local base64 = require("base64")
+local libDeflate = require("libdeflate") 
 local pretty = require("cc.pretty")
 local address = args[1]
 
@@ -51,9 +52,13 @@ local function receive()
   local recv, isBinary = ws.receive()
   if not recv then print("websocket likely closed, ending program") return nil, true end
   if not isBinary then error("non-binary message received:\n"..recv) return nil, true end
-  if recv then 
-    local ok, data = pcall(msgpack.decode, recv)
-    if not ok then return error("error decoding msgpack data:\n", recv) end
+  if recv then
+    local dfok, rdata = pcall(function()
+      return libDeflate:DecompressDeflate(recv)
+    end)
+    if not dfok then return error("error inflating pako data") end
+    local ok, data = pcall(msgpack.decode, rdata)
+    if not ok then return error("error decoding msgpack data" .. data) end
     return data, false
   end
 end
