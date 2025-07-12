@@ -122,8 +122,10 @@ end
 local function processData(data)
   print("processing " .. data.type .. " sync request")
   if data.type == "deletion" then
-    fs.delete(data.file)
-    walkUpTree(data.file)
+    for _,v in pairs(data.files) do
+      fs.delete(v)
+      walkUpTree(v)
+    end
   elseif lastFile ~= data.filePath then
     ensureFile(data.filePath, data.fileData)
     lastFile = data.filePath
