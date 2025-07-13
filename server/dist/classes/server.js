@@ -8,7 +8,7 @@ import msgpack from "@msgpack/msgpack";
 import hash from "hash-it";
 import bundler from "luabundle";
 import * as lua from "luamin";
-import pako from "pako";
+import { deflateRawSync } from "zlib";
 const luamin = lua.default;
 const BuiltinModules = [
     "cc.audio.dfpwm",
@@ -121,7 +121,7 @@ export class SyncServer {
                 const requestCount = this.requestCount.get(ws);
                 await this.waitForVariableToBe(`waiting${requestCount + 1}`, () => this.latestMessage.get(ws), 1);
                 this.requestCount.set(ws, requestCount + 1);
-                const data = pako.deflateRaw(msgpack.encode(request), { level: 9 });
+                const data = deflateRawSync(msgpack.encode(request), { level: 9 });
                 ws.send(data);
             }
         }
@@ -307,14 +307,14 @@ export class SyncServer {
             }
             return false;
         });
-        const creationRequests = dedup.filter((v) => v.type === "library" || v.type === "script").filter((v) => pako.deflateRaw(v.fileData, { level: 9 }).length < this.maxRequestSize).sort((a, b) => b.fileData.length - a.fileData.length);
+        const creationRequests = dedup.filter((v) => v.type === "library" || v.type === "script").filter((v) => deflateRawSync(v.fileData, { level: 9 }).length < this.maxRequestSize).sort((a, b) => b.fileData.length - a.fileData.length);
         const deletionRequests = dedup.filter((v) => v.type === "deletion");
-        const tooLarge = creationRequests.filter((v) => pako.deflateRaw(v.fileData, { level: 9 }).length >= this.maxRequestSize);
+        const tooLarge = creationRequests.filter((v) => deflateRawSync(v.fileData, { level: 9 }).length >= this.maxRequestSize);
         const chunks = [];
         let currentChunkSize = 0;
         let currentChunk = [];
         for (const req of creationRequests) {
-            const dataSize = pako.deflateRaw(req.fileData, { level: 9 }).length;
+            const dataSize = deflateRawSync(req.fileData, { level: 9 }).length;
             if (currentChunkSize + dataSize >= this.maxRequestSize) {
                 chunks.push(currentChunk);
                 currentChunk = [];
@@ -361,7 +361,7 @@ export class SyncServer {
                 let resultString = "";
                 const dataSplit = req.fileData.split("");
                 for (const char of dataSplit) {
-                    const resLength = pako.deflateRaw(resultString + char, { level: 9 });
+                    const resLength = deflateRawSync(resultString + char, { level: 9 });
                     if (resLength.length >= this.maxRequestSize) {
                         chunks.push([{
                                 type: "chunk",
@@ -433,7 +433,7 @@ export class SyncServer {
                         const requestCount = this.requestCount.get(ws);
                         await this.waitForVariableToBe(`waiting${requestCount + 1}`, () => this.latestMessage.get(ws), 1);
                         this.requestCount.set(ws, requestCount + 1);
-                        ws.send(pako.deflateRaw(msgpack.encode(request), { level: 9 }));
+                        ws.send(deflateRawSync(msgpack.encode(request), { level: 9 }));
                     }
                 }
                 resolve();
