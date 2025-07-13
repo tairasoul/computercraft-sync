@@ -288,7 +288,6 @@ export class SyncServer {
         return this.processChannel(channel);
     }
     async chunkRequests(requests) {
-        const s1 = Date.now();
         const alreadySeen = [];
         const dedup = requests.filter((v) => {
             if ("filePath" in v) {
@@ -309,15 +308,11 @@ export class SyncServer {
             return false;
         });
         const creationRequests = dedup.filter((v) => v.type === "library" || v.type === "script").filter((v) => pako.deflateRaw(v.fileData, { level: 9 }).length < this.maxRequestSize).sort((a, b) => b.fileData.length - a.fileData.length);
-        console.log(`took ${Date.now() - s1}ms to filter requests`);
         const deletionRequests = dedup.filter((v) => v.type === "deletion");
-        const s2 = Date.now();
         const tooLarge = creationRequests.filter((v) => pako.deflateRaw(v.fileData, { level: 9 }).length >= this.maxRequestSize);
-        console.log(`took ${Date.now() - s2}ms to filter too large requests`);
         const chunks = [];
         let currentChunkSize = 0;
         let currentChunk = [];
-        const s3 = Date.now();
         for (const req of creationRequests) {
             const dataSize = pako.deflateRaw(req.fileData, { level: 9 }).length;
             if (currentChunkSize + dataSize >= this.maxRequestSize) {
@@ -333,7 +328,6 @@ export class SyncServer {
             currentChunk = [];
             currentChunkSize = 0;
         }
-        console.log(`took ${Date.now() - s3}ms to chunk creation requests`);
         let currentFileChunkSize = 0;
         let currentFiles = [];
         const files = [];
@@ -362,7 +356,6 @@ export class SyncServer {
             ]);
         }
         const promises = [];
-        const s4 = Date.now();
         for (const req of tooLarge) {
             promises.push(new Promise((resolve) => {
                 let resultString = "";
@@ -390,7 +383,6 @@ export class SyncServer {
             }));
         }
         await Promise.all(promises);
-        console.log(`took ${Date.now() - s4}ms to chunk requests that are too large`);
         return chunks.filter((v) => v.length > 0);
     }
     getRequestsForChannel(channel) {
