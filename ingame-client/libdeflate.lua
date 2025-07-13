@@ -497,6 +497,51 @@ local function IsValidArguments(str, check_dictionary, dictionary,
   return true, ""
 end
 
+-- Deflate defines a special huffman tree, which is unique once the bit length
+-- of huffman code of all symbols are known.
+-- @param bitlen_count Number of symbols with a specific bitlen
+-- @param symbol_bitlen The bit length of a symbol
+-- @param max_symbol The max symbol among all symbols,
+--		which is (number of symbols - 1)
+-- @param max_bitlen The max huffman bit length among all symbols.
+-- @return The huffman code of all symbols.
+local function GetHuffmanCodeFromBitlen(bitlen_counts, symbol_bitlens,
+                                        max_symbol, max_bitlen)
+  local huffman_code = 0
+  local next_codes = {}
+  local symbol_huffman_codes = {}
+  for bitlen = 1, max_bitlen do
+    huffman_code = (huffman_code + (bitlen_counts[bitlen - 1] or 0)) * 2
+    next_codes[bitlen] = huffman_code
+  end
+  for symbol = 0, max_symbol do
+    local bitlen = symbol_bitlens[symbol]
+    if bitlen then
+      huffman_code = next_codes[bitlen]
+      next_codes[bitlen] = huffman_code + 1
+
+      -- Reverse the bits of huffman code,
+      -- because most signifant bits of huffman code
+      -- is stored first into the compressed data.
+      -- @see RFC1951 Page5 Section 3.1.1
+      if bitlen <= 9 then -- Have cached reverse for small bitlen.
+        symbol_huffman_codes[symbol] = _reverse_bits_tbl[bitlen][huffman_code]
+      else
+        local reverse = 0
+        for _ = 1, bitlen do
+          reverse = reverse - reverse % 2 +
+                      (((reverse % 2 == 1) or (huffman_code % 2) == 1) and 1 or
+                        0)
+          huffman_code = (huffman_code - huffman_code % 2) / 2
+          reverse = reverse * 2
+        end
+        symbol_huffman_codes[symbol] = (reverse - reverse % 2) / 2
+      end
+    end
+  end
+  return symbol_huffman_codes
+end
+
 --[[ --------------------------------------------------------------------------
 	Decompress code
 --]] --------------------------------------------------------------------------
@@ -1060,6 +1105,32 @@ function LibDeflate:DecompressDeflate(str)
     error(("Usage: LibDeflate:DecompressDeflate(str): " .. arg_err), 2)
   end
   return DecompressDeflateInternal(str)
+end
+
+-- Calculate the huffman code of fixed block
+do
+  _fix_block_literal_huffman_bitlen = {}
+  for sym = 0, 143 do _fix_block_literal_huffman_bitlen[sym] = 8 end
+  for sym = 144, 255 do _fix_block_literal_huffman_bitlen[sym] = 9 end
+  for sym = 256, 279 do _fix_block_literal_huffman_bitlen[sym] = 7 end
+  for sym = 280, 287 do _fix_block_literal_huffman_bitlen[sym] = 8 end
+
+  _fix_block_dist_huffman_bitlen = {}
+  for dist = 0, 31 do _fix_block_dist_huffman_bitlen[dist] = 5 end
+  local status
+  status, _fix_block_literal_huffman_bitlen_count, _fix_block_literal_huffman_to_deflate_code =
+    GetHuffmanForDecode(_fix_block_literal_huffman_bitlen, 287, 9)
+  assert(status == 0)
+  status, _fix_block_dist_huffman_bitlen_count, _fix_block_dist_huffman_to_deflate_code =
+    GetHuffmanForDecode(_fix_block_dist_huffman_bitlen, 31, 5)
+  assert(status == 0)
+
+  _fix_block_literal_huffman_code = GetHuffmanCodeFromBitlen(
+                                      _fix_block_literal_huffman_bitlen_count,
+                                      _fix_block_literal_huffman_bitlen, 287, 9)
+  _fix_block_dist_huffman_code = GetHuffmanCodeFromBitlen(
+                                   _fix_block_dist_huffman_bitlen_count,
+                                   _fix_block_dist_huffman_bitlen, 31, 5)
 end
 
 return LibDeflate
