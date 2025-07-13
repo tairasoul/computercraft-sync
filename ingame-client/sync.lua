@@ -28,7 +28,7 @@ if not args[2] then
   local request = http.get("http://" .. address)
   local raw = base64.from_base64(request.readAll())
   local ok, data = pcall(msgpack.decode, raw)
-  if not ok then return error("error decoding msgpack data:\n", data) end
+  if not ok then return error("error decoding msgpack data") end
   print("available channels:")
   local printed = ""
   for _,v in next, data do
