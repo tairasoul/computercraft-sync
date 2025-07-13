@@ -86,7 +86,7 @@ To connect to channels, run `sync {host-url} channels`, ex. `sync localhost:1023
 
 During the sync process, all requires are prefixed with `/` to make it search from the root of the drive. This will break requires that work relatively from the current file.
 
-`sync.lua` is always minified, as the files it gets bundled with are fairly large (libdeflate.lua is 36.1kb, msgpack.lua is 10kb)
+`sync.lua` is always minified, as the files it gets bundled with are fairly large (libdeflate.lua is 39.1kb, msgpack.lua is 10kb)
 
 ## Credits
 
