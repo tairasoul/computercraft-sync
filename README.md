@@ -45,11 +45,28 @@ You can configure the server by editing config.json (in project root, same dir a
 
 ```json5
 {
-    "port": 10234, // The port to host the Express server on. If you are connecting to localhost, the address should be localhost:port
-    "minify": false, // Should we minify the Lua code sent to the turtle? This is helpful if you wish to save space but will make debugging a pain.
-    "ngrok": false // Should we start up an ngrok tunnel for the TCP port specified? Helpful if you don't have your own domain and wish to sync with a computer when playing multiplayer.
+    "port": 10234,
+    "minify": false,
+    "ngrok": false,
+    "maxRequestSize": 50000
 }
 ```
+
+### port
+The port to start the Express server on. Used when downloading sync.lua and when connecting to the server for sync.
+
+### minify
+If true, minifies all code sent to the client. Useful if your code is larger and needs to be minified to run properly.
+
+Unnecessary if you only need to minify a specific channel, as you can set `"minify"` on a channel to specify whether that channel should be minified.
+
+### ngrok
+If true, starts up an ngrok tunnel for the specified port and logs the domain to terminal.
+
+### maxRequestSize
+How large (in bytes, I think) a request can be. Defaults to 50kb, can be set larger or smaller depending on the server config.
+
+This attempts to take into account pako deflated size, but won't be entirely accurate as deflating the entire request chunk will end up smaller than the individual requests themselves.
 
 ## Initial client setup
 

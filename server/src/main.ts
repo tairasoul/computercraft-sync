@@ -11,11 +11,12 @@ type Config = {
   port: number;
   minify: boolean;
   ngrok: boolean;
+  maxRequestSize: number;
 }
 
 const config: Config = JSON.parse(readFileSync(cfg, 'utf8'));
 
-const server = new SyncServer(config.port, "project.json", path.join(__dirname, "..", "..", "ingame-client"), config.minify);
+const server = new SyncServer(config.port, "project.json", path.join(__dirname, "..", "..", "ingame-client"), config.maxRequestSize, config.minify);
 
 server.setup();
 

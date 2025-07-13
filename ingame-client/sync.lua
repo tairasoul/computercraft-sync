@@ -53,12 +53,14 @@ local function receive()
   if not recv then print("websocket likely closed, ending program") return nil, true end
   if not isBinary then error("non-binary message received:\n"..recv) return nil, true end
   if recv then
-    local dfok, rdata = pcall(function()
-      return libDeflate:DecompressDeflate(recv)
-    end)
-    if not dfok then return error("error inflating pako data") end
-    local ok, data = pcall(msgpack.decode, rdata)
-    if not ok then return error("error decoding msgpack data" .. data) end
+    local rdata = libDeflate:DecompressDeflate(recv)
+    local data = msgpack.decode(rdata)
+    --local dfok, rdata = pcall(function()
+    --  return libDeflate:DecompressDeflate(recv)
+    --end)
+    --if not dfok then return error("error inflating pako data") end
+    --local ok, data = pcall(msgpack.decode, rdata)
+    --if not ok then return error("error decoding msgpack data" .. data) end
     return data, false
   end
 end
@@ -151,11 +153,13 @@ end
 initialConnect()
 
 while true do
-  print("waiting for data")
+  print("[" .. os.date("%H:%M:%S") .. "] waiting for data")
   sendWaiting()
   local data, close = receive()
   if close then break end
   if data then
-    processData(data)
+    for _,v in pairs(data) do
+      processData(v)
+    end
   end
 end

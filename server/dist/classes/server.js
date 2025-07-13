@@ -33,13 +33,15 @@ export class SyncServer {
     requestCount = new Map();
     luaRoot;
     minify;
-    constructor(port, projectPath, luaFilesDir, minify = false) {
+    maxRequestSize;
+    constructor(port, projectPath, luaFilesDir, maxRequestSize = 50000, minify = false) {
         this.port = port;
         this.minify = minify;
         this.luaRoot = luaFilesDir;
         this.project = JSON.parse(fs.readFileSync(path.join(process.cwd(), projectPath), 'utf8'));
         const expr = express();
         this.server = expressWs(expr).app;
+        this.maxRequestSize = maxRequestSize;
     }
     setup() {
         this.server.get("/", (req, res) => {
@@ -85,6 +87,17 @@ export class SyncServer {
                 },
                 ignoredModuleNames: BuiltinModules
             })));
+            /*res.send(bundler.bundle(file, {
+              resolveModule: (modu) => {
+                if (modu === "msgpack")
+                  return path.join(this.luaRoot, "msgpack.lua");
+                if (modu === "base64")
+                  return path.join(this.luaRoot, "base64.lua");
+                if (modu === "libdeflate")
+                  return path.join(this.luaRoot, "libdeflate.lua");
+              },
+              ignoredModuleNames: BuiltinModules
+            }))*/
         });
         this.server.listen(this.port, () => {
             console.log(`hosting sync server on port ${this.port}`);
@@ -103,7 +116,7 @@ export class SyncServer {
     async newSubscription(ws) {
         const subscribedChannels = this.subscribed.get(ws);
         for (const channel of subscribedChannels) {
-            const requests = this.getRequestsForChannel(channel);
+            const requests = await this.getRequestsForChannel(channel);
             for (const request of requests) {
                 const requestCount = this.requestCount.get(ws);
                 await this.waitForVariableToBe(`waiting${requestCount + 1}`, () => this.latestMessage.get(ws), 1);
@@ -168,36 +181,29 @@ export class SyncServer {
             newContent = luamin.minify(newContent);
         return newContent;
     }
-    splitStringIntoChunks(str, chunkSize) {
-        const encoder = new TextEncoder();
-        const encoded = encoder.encode(str);
-        const chunks = [];
-        for (let i = 0; i < encoded.length; i += chunkSize) {
-            const chunk = encoded.slice(i, i + chunkSize);
-            const decodedChunk = new TextDecoder().decode(chunk);
-            chunks.push(decodedChunk);
-        }
-        return chunks;
-    }
+    /*private splitStringIntoChunks(str: string, chunkSize: number) {
+      const encoder = new TextEncoder();
+      const encoded = encoder.encode(str);
+      const chunks: string[] = [];
+  
+      for (let i = 0; i < encoded.length; i += chunkSize) {
+        const chunk = encoded.slice(i, i + chunkSize);
+        const decodedChunk = new TextDecoder().decode(chunk);
+        chunks.push(decodedChunk);
+      }
+  
+      return chunks;
+    }*/
     processFiles(channel) {
         const data = [];
         for (const file of channel.files ?? []) {
             const fdata = fs.readFileSync(path.join(process.cwd(), this.project.rootDir, file.path), 'utf8');
             const processed = this.preprocess(fdata);
-            const chunks = this.splitStringIntoChunks(channel.minify ? luamin.minify(processed) : processed, 50 * 1000);
             data.push({
                 type: channel.type,
-                fileData: chunks[0],
+                fileData: channel.minify && !this.minify ? luamin.minify(processed) : processed,
                 filePath: file.name
             });
-            if (chunks.length > 1) {
-                for (let i = 1; i < chunks.length; i++)
-                    data.push({
-                        type: "chunk",
-                        fileData: chunks[i],
-                        filePath: file.name
-                    });
-            }
             /*data.push({
               type: channel.type,
               fileData: processed,
@@ -216,20 +222,11 @@ export class SyncServer {
                 realFiles.push(path.join(directory, file));
                 const fdata = fs.readFileSync(filepath, 'utf8');
                 const processed = this.preprocess(fdata);
-                const chunks = this.splitStringIntoChunks(channel.minify ? luamin.minify(processed) : processed, 50 * 1000);
                 data.push({
                     type: channel.type,
-                    fileData: chunks[0],
+                    fileData: channel.minify && !this.minify ? luamin.minify(processed) : processed,
                     filePath: path.join(directory, file)
                 });
-                if (chunks.length > 1) {
-                    for (let i = 1; i < chunks.length; i++)
-                        data.push({
-                            type: "chunk",
-                            fileData: chunks[i],
-                            filePath: path.join(directory, file)
-                        });
-                }
                 /*data.push({
                   type: channel.type,
                   fileData: processed,
@@ -292,7 +289,122 @@ export class SyncServer {
             return this.processLibrary(channel);
         return this.processChannel(channel);
     }
+    async chunkRequests(requests) {
+        const s1 = Date.now();
+        const alreadySeen = [];
+        const dedup = requests.filter((v) => {
+            if ("filePath" in v) {
+                const path = v.filePath;
+                const h = hash(v.fileData).toString();
+                if (!alreadySeen.includes(`${path}${h}`)) {
+                    alreadySeen.push(`${path}${h}`);
+                    return true;
+                }
+            }
+            if ("files" in v) {
+                const h = hash(v.files).toString();
+                if (!alreadySeen.includes(h)) {
+                    alreadySeen.push(h);
+                    return true;
+                }
+            }
+            return false;
+        });
+        const creationRequests = dedup.filter((v) => v.type === "library" || v.type === "script").filter((v) => pako.deflateRaw(v.fileData, { level: 9 }).length < this.maxRequestSize).sort((a, b) => b.fileData.length - a.fileData.length);
+        console.log(`took ${Date.now() - s1}ms to filter requests`);
+        const deletionRequests = dedup.filter((v) => v.type === "deletion");
+        const s2 = Date.now();
+        const tooLarge = creationRequests.filter((v) => pako.deflateRaw(v.fileData, { level: 9 }).length >= this.maxRequestSize);
+        console.log(`took ${Date.now() - s2}ms to filter too large requests`);
+        const chunks = [];
+        let currentChunkSize = 0;
+        let currentChunk = [];
+        const s3 = Date.now();
+        for (const req of creationRequests) {
+            const dataSize = pako.deflateRaw(req.fileData, { level: 9 }).length;
+            if (currentChunkSize + dataSize >= this.maxRequestSize) {
+                chunks.push(currentChunk);
+                currentChunk = [];
+                currentChunkSize = 0;
+            }
+            currentChunkSize += dataSize;
+            currentChunk.push(req);
+        }
+        if (currentChunk.length > 0) {
+            chunks.push(currentChunk);
+            currentChunk = [];
+            currentChunkSize = 0;
+        }
+        console.log(`took ${Date.now() - s3}ms to chunk creation requests`);
+        let currentFileChunkSize = 0;
+        let currentFiles = [];
+        const files = [];
+        for (const req of deletionRequests) {
+            const dataSizes = req.files.map((v) => ({ path: v, length: v.length }));
+            let currentFiles = [];
+            for (const size of dataSizes) {
+                const dsize = size.length;
+                if (currentFileChunkSize + dsize >= this.maxRequestSize) {
+                    files.push(currentFiles);
+                    currentFiles = [];
+                    currentFileChunkSize = 0;
+                }
+                currentFileChunkSize += dsize;
+                currentFiles.push(size.path);
+            }
+        }
+        if (currentFiles.length > 0)
+            files.push(currentFiles);
+        for (const deleteChunk of files) {
+            chunks.push([
+                {
+                    type: "deletion",
+                    files: deleteChunk
+                }
+            ]);
+        }
+        const promises = [];
+        const s4 = Date.now();
+        for (const req of tooLarge) {
+            promises.push(new Promise((resolve) => {
+                let resultString = "";
+                const dataSplit = req.fileData.split("");
+                for (const char of dataSplit) {
+                    const resLength = pako.deflateRaw(resultString + char, { level: 9 });
+                    if (resLength.length >= this.maxRequestSize) {
+                        chunks.push([{
+                                type: "chunk",
+                                fileData: resultString,
+                                filePath: req.filePath
+                            }]);
+                        resultString = "";
+                    }
+                    resultString = resultString + char;
+                }
+                if (resultString.length > 0) {
+                    chunks.push([{
+                            type: "chunk",
+                            fileData: resultString,
+                            filePath: req.filePath
+                        }]);
+                }
+                resolve();
+            }));
+        }
+        await Promise.all(promises);
+        console.log(`took ${Date.now() - s4}ms to chunk requests that are too large`);
+        return chunks.filter((v) => v.length > 0);
+    }
     getRequestsForChannel(channel) {
+        const pchannel = this.project.project.find((v) => v.channelName === channel);
+        if (!pchannel)
+            throw `Channel ${channel} does not exist!`;
+        const requests = this.runProcess(channel);
+        const chunks = this.chunkRequests(requests);
+        //return requests;
+        return chunks;
+    }
+    getRequestsForChannelRaw(channel) {
         const pchannel = this.project.project.find((v) => v.channelName === channel);
         if (!pchannel)
             throw `Channel ${channel} does not exist!`;
@@ -302,7 +414,7 @@ export class SyncServer {
     async UpdateHashes() {
         let changed = false;
         for (const channel of this.getChannels()) {
-            const requests = this.getRequestsForChannel(channel);
+            const requests = this.getRequestsForChannelRaw(channel);
             const channelHash = hash(requests);
             const previousHash = this.channelHashes.get(channel);
             if (channelHash !== previousHash) {
@@ -317,7 +429,7 @@ export class SyncServer {
     async sendForChanged() {
         const data = new Map();
         for (const channel of this.channelsChanged) {
-            const requests = this.getRequestsForChannel(channel);
+            const requests = await this.getRequestsForChannel(channel);
             data.set(channel, requests);
         }
         const promises = [];
