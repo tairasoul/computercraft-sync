@@ -177,8 +177,6 @@ export class SyncServer {
         for (const modified of modifiedRequires) {
             newContent = newContent.replace(modified.original, modified.replacement);
         }
-        if (this.minify)
-            newContent = luamin.minify(newContent);
         return newContent;
     }
     /*private splitStringIntoChunks(str: string, chunkSize: number) {
@@ -201,7 +199,7 @@ export class SyncServer {
             const processed = this.preprocess(fdata);
             data.push({
                 type: channel.type,
-                fileData: channel.minify && !this.minify ? luamin.minify(processed) : processed,
+                fileData: channel.minify || this.minify ? luamin.minify(processed) : processed,
                 filePath: file.name
             });
             /*data.push({
@@ -224,7 +222,7 @@ export class SyncServer {
                 const processed = this.preprocess(fdata);
                 data.push({
                     type: channel.type,
-                    fileData: channel.minify && !this.minify ? luamin.minify(processed) : processed,
+                    fileData: channel.minify || this.minify ? luamin.minify(processed) : processed,
                     filePath: path.join(directory, file)
                 });
                 /*data.push({
