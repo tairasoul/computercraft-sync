@@ -41,7 +41,7 @@ This project also sends the entire channel's data every time a file is changed, 
 
 ## Config 
 
-You can configure the server by editing server/config.json.
+You can configure the server by editing config.json (in project root, same dir as project.json).
 
 ```json5
 {
