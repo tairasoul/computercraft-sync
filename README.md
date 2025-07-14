@@ -66,7 +66,7 @@ If true, starts up an ngrok tunnel for the specified port and logs the domain to
 ### maxRequestSize
 How large (in bytes, I think) a request can be. Defaults to 50kb, can be set larger or smaller depending on the server config.
 
-This attempts to take into account pako deflated size, but won't be entirely accurate as deflating the entire request chunk will end up smaller than the individual requests themselves.
+This attempts to take into account deflated size, but won't be entirely accurate as deflating the entire request chunk will end up smaller than the individual requests themselves.
 
 ## Initial client setup
 
