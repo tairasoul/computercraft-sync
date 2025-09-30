@@ -96,3 +96,7 @@ libdeflate.lua is from https://github.com/SafeteeWoW/LibDeflate
     - the provided LibDeflate is trimmed down to only include decompressdeflate to save on filesize
 
 I forgot where base64.lua is from, but I remember it being from some roblox devforum thread.
+
+## Todo
+
+Maybe port off of typescript to something like c#? Might be better suited.
