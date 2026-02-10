@@ -1,0 +1,4 @@
+lua/base85.lua linguist-vendored
+lua/libdeflate.lua linguist-vendored
+lua/llz4.lua linguist-vendored
+lua/msgpack.lua linguist-vendored
