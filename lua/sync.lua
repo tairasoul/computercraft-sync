@@ -1,14 +1,12 @@
 local args = arg 
-local msgpack = require("msgpack")
-local base64 = require("base64")
-local libDeflate = require("libdeflate") 
-local pretty = require("cc.pretty")
+local msgpack = require("./msgpack")
+local libDeflate = require("/cc-sync/libdeflate").libDeflate
 local address = args[1]
 
 local function split(input, delimiter)
   local result = {}
   for part in string.gmatch(input, "([^" .. delimiter .. "]+)") do
-      table.insert(result, part)
+    table.insert(result, part)
   end
   return result
 end
@@ -24,32 +22,38 @@ if not address then
   return
 end
 
+local function trim(s) return s:match'^()%s*$' and '' or s:match'^%s*(.*%S)' end
+
 if not args[2] then 
   local request = http.get("http://" .. address)
-  local raw = base64.from_base64(request.readAll())
-  local ok, data = pcall(msgpack.decode, raw)
-  if not ok then return error("error decoding msgpack data") end
-  print("available channels:")
-  local printed = ""
-  for _,v in next, data do
-    printed = printed .. v.channel .. " (" .. v.type .. " channel)\n"
-  end
-  --[[local channels = split(data, ",")
-  print("available channels:")
-  local printed = ""
-  for _,v in next, channels do
-    printed = printed .. v
-    printed = printed .. "\n"
-  end]]
-  textutils.pagedPrint(printed)
+  local raw = libDeflate:DecompressDeflate(request.readAll())
+  textutils.pagedPrint("available channels:\n"..trim(raw))
   return
 end
 
-print("connecting to websocket")
-local ws = http.websocket("ws://" .. address .. "/subscribe")
+local channels = { select(2, unpack(args)) }
+local ws_addr = "ws://" .. address .. "/subscribe?channels=" .. table.concat(channels, ",")
+print("connecting to address " .. ws_addr)
+local ws, err = http.websocket(ws_addr)
+if not ws then
+  print("failed when connecting")
+  print(err)
+  return
+end
 
 local function receive() 
-  local recv, isBinary = ws.receive()
+  local ev, ev1, ev2, ev3 = os.pullEventRaw()
+  if ev == "websocket_closed" then
+    return nil, true
+  end
+  if ev == "terminate" then
+    ws.close()
+    return nil, true
+  end
+  if ev ~= "websocket_message" then
+    return nil, false
+  end
+  local recv, isBinary = ev2, ev3
   if not recv then print("websocket likely closed, ending program") return nil, true end
   if not isBinary then error("non-binary message received:\n"..recv) return nil, true end
   if recv then
@@ -112,27 +116,23 @@ local function walkUpTree(path)
   checkFolder(currentPath)
 end
 
+local lastFile = ""
+
 local function addPortion(data)
-  local f = fs.open(data.filePath, "a")
+  local f = fs.open(lastFile, "a")
   f.write(data.fileData)
   f.close()
 end
 
-local lastFile = ""
-local currentRequest = 0
-
-local function sendWaiting()
-  ws.send("waiting" .. currentRequest)
-  currentRequest = currentRequest + 1
-end
-
 local function processData(data)
   print("processing " .. data.type .. " sync request")
-  if data.type == "deletion" then
+  if data.type == "d" then
     for _,v in pairs(data.files) do
       fs.delete(v)
       walkUpTree(v)
     end
+  elseif data.type == "c" then
+    addPortion(data)
   elseif lastFile ~= data.filePath then
     ensureFile(data.filePath, data.fileData)
     lastFile = data.filePath
@@ -141,25 +141,15 @@ local function processData(data)
   end
 end
 
-local function initialConnect()
-  local channels = { select(2, unpack(args)) }
-  local sending = {
-    type = "subscribe",
-    channels = channels
-  }
-  ws.send(base64.to_base64(msgpack.encode(sending)))
-end
-
-initialConnect()
+print("[" .. os.date("%H:%M:%S") .. "] waiting for data")
 
 while true do
-  print("[" .. os.date("%H:%M:%S") .. "] waiting for data")
-  sendWaiting()
   local data, close = receive()
   if close then break end
   if data then
     for _,v in pairs(data) do
       processData(v)
     end
+    print("[" .. os.date("%H:%M:%S") .. "] waiting for data")
   end
 end

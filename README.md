@@ -1,102 +1,237 @@
-# CC:T Syncing Server
+# computercraft tweaked sync server
+or technically any computer mod that runs lua, if you modify sync.lua a little bit
 
-A primarily [TypescriptToLua](https://typescripttolua.github.io/) oriented CC:T sync server.
+made because no other sync servers existed
 
-Made because I didn't want to manually enter everything and the other tools I could find didn't serve the sole purpose of syncing files, instead being either a turtle remote access tool or a turtle emulator.
+## note
 
-Heavily biased towards my own usecases, and will likely be missing more general-use QOL features.
+unwrap() is used in a lot of places in the project as of current, and it should not be treated as a production-ready program (wherever you'd call "production" for computercraft)
 
-project.json structure:
-```json5
-{
-    "rootDir": "dir", // The directory to search for files in. This is relative to where you're running the server, so "." would resolve to the current directory, and "build" would resolve to "currentDirectory/build"
-    "project": [     // This is where we declare the various channels available to clients.
-        {
-           "type": "library", // Can be "library" or "script", "library" channels can be requirements for other channels, library or script.
-           "files": [
-                {
-                    "path": "startups/testlib.lua", // Path to file
-                    "name": "startup.lua" // Resulting path on CC filesystem
-                }
-            ], // All the files this channel contains. Optional as long as directories is declared.
-           "channelName": "testlib", // The channel the client has to connect to in order to sync these files.
-           "directories": ["lib1/subdir"], // Folders that should be watched for this channel. Optional as long as files is declared.
-           "requiredChannels": ["testreq"], // The channels required for this channel to function. Circular dependencies are not handled and should be avoided.
-           "minify": true // Optional, if true this channel's contents will be minified (does not apply to required channels)
-        }
-    ]
-}
+## usage
+
+in order to use this, download the binary from Releases, put it in a project folder (`project.ron` should be at the root), and run it
+
+then, in cc, run `wget run http://url-to-server:port/download-sync` to download everything needed (port is optional if it's just a DNS record)
+
+ngrok tcp tunnels can be used for this
+
+after that, you can run `sync` to print sync.lua's usage, run `sync url-to-server:port` to list channels, or run `sync url-to-server:port channels to sync` in order to subscribe to a list of space-separated channels
+
+for example, to subscribe to channels `common` and `ui`, run `sync url-to-server:port common ui`
+
+## config
+
+configuring a project is done in a file called `project.ron`
+
+this file looks like this
+
+```ron
+Project(
+	root_dir: "src", // relative to project.ron
+	max_uncompressed_request_size: 100000, // how many bytes can a request be before it needs to be chunked when sending it
+	port: 10234, // port to run the server on
+	minify: true, // default to minifying files
+	deflate_trickery: true, // default to doing deflate bullshit on files
+	require_prefix: "/", // what to prefix requires with by default
+	prefix_exclusions: ["some.library"], // requires to exclude from prefixing
+	lz_on_deflate: true, // should lz4 be used to compress libdeflate.lua
+	sync_interval: 2, // how long to wait between checks for syncing (in seconds)
+	items: [
+		// channels in the project
+		ProjectItem(
+			type: Library, // can be Resource, Library or Script
+			channel_name: "example-library", // name of the channel, used when subscribing
+			// minify, deflate_trickery, require_prefix and prefix_exclusions work here too
+			// whatever you set these to takes priority over project root
+			required_channels: ["example-dependency"], // optional, channels to implicitly subscribe to and send to the client alongside this one
+			directories: [ // optional
+				// directories to sync
+				Directory(
+					path: "example-dir", // relative to project root, so "src/example-dir"
+					// minify, deflate_trickery, require_prefix and prefix_exclusions work here too
+					// whatever you set these to takes priority over project root and the channel
+				)
+			],
+			files: [ // optional
+				// specific files to sync
+				File(
+					path: "example-file.lua", // relative to project root
+					cc_path: "startup.lua", // optional, where to place the file on the computer
+					// minify, deflate_trickery, require_prefix and prefix_exclusions work here too
+					// whatever you set these to takes priority over project root, the channel and the directory (if this file is in one)
+					bundle: true // bundle this file.
+					// when bundling, you should not add the channels that this would otherwise require,
+					// as that will just sync the entire channel alongside the bundled file
+				)
+			]
+		)
+	]
+)
 ```
-Note: Both `files` and `directories` are optional if the channel is a `library` and has `requiredChannels` set. This is for libraries that represent several other libraries joined together.
 
-If you wish to sync multiple channels at once, a single client can request to connect to several channels.
+## channel types
 
-Upon connection, the first packet sent is a "subscribe" packet, detailing the channels the client wishes to sync.
+channel types have few differences, those that do are listed here
 
-If a "GET" request is sent to "/", we respond with all available channels and their types.
+### Resource
 
-I don't know how to make a sort of "sourcemap" to ensure the client can remove files that are no longer in the project, especially seeing as there's multiple channels to connect to, so auto-removing files is not a feature. If I work on this further, I might try to add that.
+should be used for pure data files, if deflate_trickery'd will be turned into a valid lua file you can require to get the original data
 
-This project also sends the entire channel's data every time a file is changed, so it's currently fairly inefficient when it comes to network usage.
+minify & bundle do nothing on these channels
 
-## Config 
+### Library & Script
 
-You can configure the server by editing config.json (in project root, same dir as project.json).
+used for actual lua files, both act exactly the same
 
-```json5
-{
-    "port": 10234,
-    "minify": false,
-    "ngrok": false,
-    "maxRequestSize": 50000
-}
-```
+## defaults
 
-### port
-The port to start the Express server on. Used when downloading sync.lua and when connecting to the server for sync.
+if not specified, overridden by the corresponding setting on the directory, channel or project:
 
-### minify
-If true, minifies all code sent to the client. Useful if your code is larger and needs to be minified to run properly.
+minify: false
 
-Unnecessary if you only need to minify a specific channel, as you can set `"minify"` on a channel to specify whether that channel should be minified.
+deflate_trickery: false
 
-### ngrok
-If true, starts up an ngrok tunnel for the specified port and logs the domain to terminal.
+require_prefix: none
 
-### maxRequestSize
-How large (in bytes, I think) a request can be. Defaults to 50kb, can be set larger or smaller depending on the server config.
+prefix_exclusions: none
 
-This attempts to take into account deflated size, but won't be entirely accurate as deflating the entire request chunk will end up smaller than the individual requests themselves.
+### Project
 
-## Initial client setup
+lz_on_deflate: false
 
-Setting up a client is fairly simple.
+sync_interval: 1
 
-In order to get the syncing script, run `wget {host-url}/sync.lua`
+### File
 
-`{host-url}` should either be a URL logged in the console (adding http://) or your own domain, depending on how you choose to run this.
+cc_path: same as path
 
-If running this on the same computer, you can just run `wget http://localhost:10234/sync.lua` if you've set up your config to allow local connections.
+## programming crimes
 
-To get all available channels, run `sync {host-url}`
+deflate_trickery is the primary horrid crime in this project
 
-To connect to channels, run `sync {host-url} channels`, ex. `sync localhost:10234 testlib1 testlib2`
+when using deflate_trickery, the file is compressed with the highest compression possible using `flate2`, then encoded into base85 and embedded into a file
 
-## Notes
+the resulting file looks something like this
 
-During the sync process, all requires are prefixed with `/` to make it search from the root of the drive. This will break requires that work relatively from the current file.
+`return load(require("/cc-sync/libdeflate").libDeflate:DecompressDeflate(select(2, require("/cc-sync/base8\").decode("base85"))))(...)` where base85 is the encoded libdeflate data
 
-`sync.lua` is always minified, as the files it gets bundled with are fairly large (libdeflate.lua is 39.1kb, msgpack.lua is 10kb)
+load()(...) is excluded if it's a resource
 
-## Credits
+## potential improvements
 
-msgpack.lua is from https://github.com/kieselsteini/msgpack
+base85 increases the size of the data it's representing almost as much as base45, but it should be possible to make a base94 variant while attempting to keep base45's storage optimizations
 
-libdeflate.lua is from https://github.com/SafeteeWoW/LibDeflate
-    - the provided LibDeflate is trimmed down to only include decompressdeflate to save on filesize
+# attributions
 
-I forgot where base64.lua is from, but I remember it being from some roblox devforum thread.
+[`lua/base85.lua`](https://github.com/Anaminus/roblox-library/blob/master/modules/Base85/init.lua) is licensed under the MIT-0 license, original license follows
 
-## Todo
+<details><summary>lua/base85.lua LICENSE (click to view)</summary>
+MIT No Attribution
 
-Maybe port off of typescript to something like c#? Might be better suited.
+Copyright 2022 Anaminus
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+</details>
+
+[`lua/libdeflate.lua`](https://github.com/SafeteeWoW/LibDeflate/blob/main/LibDeflate.lua) is licensed under the Zlib license
+
+lua/libdeflate.lua is altered to remove WoW related functions, cli, internals and to allow for use in TypescriptToLua
+
+original license follows
+
+
+<details><summary>lua/libdeflate.lua LICENSE (click to view)</summary>
+zlib License
+
+(C) 2018-2021 Haoqian He
+
+This software is provided 'as-is', without any express or implied
+warranty.  In no event will the authors be held liable for any damages
+arising from the use of this software.
+
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+
+1. The origin of this software must not be misrepresented; you must not
+   claim that you wrote the original software. If you use this software
+   in a product, an acknowledgment in the product documentation would be
+   appreciated but is not required.
+2. Altered source versions must be plainly marked as such, and must not be
+   misrepresented as being the original software.
+3. This notice may not be removed or altered from any source distribution.
+</details>
+
+[`lua/llz4.lua`](https://github.com/RiskoZoSlovenska/llz4/blob/main/llz4.lua) is licensed under the MIT license
+
+altered to remove the code that allows for lua runtime compat since the target is cc
+
+goto is also removed because darklua doesnt support those
+
+original license follows
+
+<details><summary>lua/llz4.lua LICENSE (click to view)</summary>
+MIT License
+
+Copyright (c) 2025 RiskoZoSlovenska
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+</details>
+
+[`lua/msgpack.lua`](https://github.com/kieselsteini/msgpack/blob/master/msgpack.lua) is licensed under the Unlicense, original license follows
+
+<details><summary>lua/msgpack LICENSE (click to view)</summary>
+This is free and unencumbered software released into the public domain.
+
+Anyone is free to copy, modify, publish, use, compile, sell, or
+distribute this software, either in source code form or as a compiled
+binary, for any purpose, commercial or non-commercial, and by any
+means.
+
+In jurisdictions that recognize copyright laws, the author or authors
+of this software dedicate any and all copyright interest in the
+software to the public domain. We make this dedication for the benefit
+of the public at large and to the detriment of our heirs and
+successors. We intend this dedication to be an overt act of
+relinquishment in perpetuity of all present and future rights to this
+software under copyright law.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
+For more information, please refer to <http://unlicense.org/>
+</details>
