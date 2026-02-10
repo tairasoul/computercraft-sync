@@ -79,7 +79,7 @@ impl NodeProcessor for Prefixer {
 }
 
 impl RuleConfiguration for PrefixRequireRule {
-	fn configure(&mut self, properties: darklua_core::rules::RuleProperties) -> Result<(), darklua_core::rules::RuleConfigurationError> {
+	fn configure(&mut self, _: darklua_core::rules::RuleProperties) -> Result<(), darklua_core::rules::RuleConfigurationError> {
 		Ok(())
 	}
 

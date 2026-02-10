@@ -1,12 +1,10 @@
-use std::{collections::HashSet, env::{self, current_dir}, io::Write, path::{Path, PathBuf}, sync::Arc, time::Duration};
-use flate2::{Compression, write::{self, DeflateEncoder}};
+use std::{env::current_dir, path::PathBuf, sync::Arc};
 #[allow(unused)]
 use notify::{EventHandler, Watcher};
-use ohkami::{Config, Ohkami, Query, Request, Response, Route, Status, fang::Context, ws::{Message, WebSocket, WebSocketContext}};
+use ohkami::{Config, Ohkami, Route, fang::Context};
 use parking_lot::RwLock;
-use serde::Deserialize;
 use tokio::sync::broadcast::{Receiver, Sender, channel};
-use crate::{server::{handlers::{downloads::{handle_download, handle_download_b85, handle_download_base_b85, handle_download_base_libdeflate, handle_download_base_lz4, handle_download_base_sync, handle_download_libdeflate, handle_download_lz4, handle_download_nomin, handle_download_sync}, root::handle_get_root, websocket::handle_subscribe}, util::get_files_for_channel}, structs::{Project, ProjectItem}};
+use crate::{server::{handlers::{downloads::{handle_download, handle_download_b85, handle_download_base_b85, handle_download_base_libdeflate, handle_download_base_lz4, handle_download_base_sync, handle_download_libdeflate, handle_download_lz4, handle_download_nomin, handle_download_sync}, root::handle_get_root, websocket::handle_subscribe}, util::get_files_for_channel}, structs::Project};
 use super::file_watcher::FileChanged;
 #[cfg(not(test))]
 use super::file_watcher::FileWatcher;
@@ -48,6 +46,7 @@ impl SyncServer {
 		let files = self.get_all_current_files();
 		#[cfg(not(test))]
 		tokio::spawn(async move {
+    	use std::collections::HashSet;
 			let mut all_existing_files: HashSet<PathBuf> = HashSet::new();
 			for file in files {
 				all_existing_files.insert(file);
