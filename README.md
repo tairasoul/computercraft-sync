@@ -117,6 +117,32 @@ the resulting file looks something like this
 
 load()(...) is excluded if it's a resource
 
+## server routes
+
+/ - get a libdeflated newline-separated list of channels formatted as `channel_name - channel_type`
+
+/libdeflate.lua - get a minified (and lz4'd, if the option is set) version of lua/libdeflate.lua
+
+/sync.lua - get a minified version of lua/sync.lua
+
+/base85.lua - get a minified version of lua/base85.lua
+
+/lz4.lua - get a minified version of lua/llz4.lua
+
+/base-sync.lua - get the unminified (still bundled with msgpack) version of lua/sync.lua
+
+/base-libdeflate.lua - get the unminified version of lua/libdeflate.lua
+
+/base-base85.lua - get the unminified version of lua/base85.lua
+
+/base-lz4.lua - get the unminified version of lua/llz4.lua
+
+/download - get the script for downloading everything necessary for sync.lua to run, from the regular routes
+
+/download-nomin - get the script for downloading everything necessary for sync.lua to run, from the base* routes
+
+/subscribe?channels=comma,separated,list - subscribe to channels, channels are separated by commas in the channels parameter
+
 ## potential improvements
 
 base85 increases the size of the data it's representing almost as much as base45, but it should be possible to make a base94 variant while attempting to keep base45's storage optimizations
