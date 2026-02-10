@@ -11,7 +11,7 @@ unwrap() is used in a lot of places in the project as of current, and it should 
 
 in order to use this, download the binary from Releases, put it in a project folder (`project.ron` should be at the root), and run it
 
-then, in cc, run `wget run http://url-to-server:port/download-sync` to download everything needed (port is optional if it's just a DNS record)
+then, in cc, run `wget run http://url-to-server:port/download` to download everything needed (port is optional if it's just a DNS record)
 
 ngrok tcp tunnels can be used for this
 
