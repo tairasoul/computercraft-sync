@@ -1,4 +1,4 @@
-use darklua_core::{Resources, nodes::{Arguments, BinaryExpression, BinaryOperator, Expression, FunctionCall, Identifier, Prefix, StringExpression}, process::{DefaultVisitor, NodeProcessor, NodeVisitor}, rules::{Context, FlawlessRule, Rule, RuleConfiguration, RuleProperties}};
+use darklua_core::{nodes::{Arguments, BinaryExpression, BinaryOperator, Expression, FunctionCall, Prefix, StringExpression}, process::{DefaultVisitor, NodeProcessor, NodeVisitor}, rules::{Context, FlawlessRule, RuleConfiguration, RuleProperties}};
 
 #[derive(Debug)]
 pub struct PrefixRequireRule {
@@ -32,6 +32,10 @@ impl Prefixer {
 								let expr = exprs.get(i).unwrap().clone();
 								if let Expression::String(strexpr) = expr {
 									let str = strexpr.get_string_value().unwrap();
+									if self.exceptions.contains(&str.to_string()) {
+										new_args.push(Expression::String(strexpr));
+										continue;
+									}
 									let combined = "\"".to_owned() + &self.prefix + str + "\"";
 									let new_expr = Expression::String(StringExpression::new(&combined).unwrap());
 									new_args.push(new_expr);
