@@ -133,11 +133,9 @@ local function processData(data)
     end
   elseif data.type == "c" then
     addPortion(data)
-  elseif lastFile ~= data.filePath then
+  else
     ensureFile(data.filePath, data.fileData)
     lastFile = data.filePath
-  else 
-    addPortion(data)
   end
 end
 
