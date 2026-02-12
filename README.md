@@ -7,6 +7,8 @@ made because no other sync servers existed
 
 unwrap() is used in a lot of places in the project as of current, and it should not be treated as a production-ready program (wherever you'd call "production" for computercraft)
 
+ohkami also seems to be a little weird with the websockets and waiting for them to close, you have to kill the process manually instead of ctrl+C'ing it else it'll hang until timeout is reached (which is set to 4 hours)
+
 ## usage
 
 in order to use this, download the binary from Releases, put it in a project folder (`project.ron` should be at the root), and run it
