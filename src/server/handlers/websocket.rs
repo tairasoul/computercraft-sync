@@ -61,7 +61,7 @@ pub async fn handle_subscribe(
 		loop {
 			tokio::select! {
 				biased;
-				
+
 				trnsmit = rx.recv() => {
 					if let Ok(msg) = trnsmit {
 						match msg {
@@ -113,6 +113,7 @@ pub async fn handle_subscribe(
 								deflate.finish().unwrap()
 							};
 							lock.send(Message::Binary(byte_vec)).await.unwrap();
+							lock.flush().await.unwrap();
 						}
 					}
 				}
