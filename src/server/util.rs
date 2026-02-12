@@ -1,6 +1,6 @@
 use std::{collections::HashSet, env, io::Write, path::{Path, PathBuf}, sync::Arc};
 
-use darklua_core::{BundleConfiguration, Configuration, Options, Resources, rules::{ComputeExpression, FilterAfterEarlyReturn, GroupLocalAssignment, PathRequireMode, RemoveComments, RemoveEmptyDo, RemoveIfExpression, RemoveNilDeclaration, RemoveSpaces, RemoveTypes, RemoveUnusedVariable, RemoveUnusedWhile, RenameVariables, Rule, bundle::BundleRequireMode}};
+use darklua_core::{BundleConfiguration, Configuration, Options, Resources, rules::{ComputeExpression, FilterAfterEarlyReturn, GroupLocalAssignment, PathRequireMode, RemoveComments, RemoveEmptyDo, RemoveFunctionCallParens, RemoveIfExpression, RemoveMethodDefinition, RemoveNilDeclaration, RemoveSpaces, RemoveTypes, RemoveUnusedVariable, RemoveUnusedWhile, RenameVariables, Rule, bundle::BundleRequireMode}};
 use flate2::{Compression, write::DeflateEncoder};
 use lazy_regex::regex_replace_all;
 use parking_lot::RwLock;
@@ -325,7 +325,6 @@ pub fn process_file(file: &PathBuf, root: &PathBuf, item_type: ProjectItemType, 
 		if minify {
 			// manually comment out gotos so darklua's parser doesnt screw up
 			comment_gotos(&mut content);
-			println!("new content is {}", content);
 			let cfg = get_darklua_cfg();
 			let resources = Resources::from_memory();
 			resources.write(file.file_name().unwrap(), &content).unwrap();
@@ -632,8 +631,11 @@ pub fn get_darklua_cfg() -> Configuration {
 	let gla: Box<dyn Rule> = Box::new(GroupLocalAssignment::default());
 	let rc: Box<dyn Rule> = Box::new(RemoveComments::default().with_exception("--autocommented"));
 	let rt: Box<dyn Rule> = Box::new(RemoveTypes::default());
+	let rfcp: Box<dyn Rule> = Box::new(RemoveFunctionCallParens::default());
+	let rmd: Box<dyn Rule> = Box::new(RemoveMethodDefinition::default());
 	Configuration::empty()
-		.with_rule(faer)
+		.with_rule(rmd)
+		.with_rule(rfcp)
 		.with_rule(rc)
 		.with_rule(rt)
 		.with_rule(ce)
@@ -645,4 +647,5 @@ pub fn get_darklua_cfg() -> Configuration {
 		.with_rule(rv)
 		.with_rule(gla)
 		.with_rule(rif)
+		.with_rule(faer)
 }
