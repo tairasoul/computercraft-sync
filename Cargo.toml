@@ -11,6 +11,7 @@ darklua = "0.17.3"
 flate2 = { version = "1.1.8", features = ["zlib-rs"], default-features = false }
 futures-util = "0.3.31"
 itertools = "0.14.0"
+lazy-regex = "3.6.0"
 lz4_flex = "0.12.0"
 notify = "8.2.0"
 ohkami = { version = "0.24.5", features = ["rt_tokio", "ws"] }

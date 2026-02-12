@@ -1,7 +1,8 @@
 use std::{collections::HashSet, env, io::Write, path::{Path, PathBuf}, sync::Arc};
 
-use darklua_core::{BundleConfiguration, Configuration, Options, Resources, rules::{ComputeExpression, FilterAfterEarlyReturn, GroupLocalAssignment, PathRequireMode, RemoveComments, RemoveContinue, RemoveEmptyDo, RemoveIfExpression, RemoveNilDeclaration, RemoveSpaces, RemoveTypes, RemoveUnusedVariable, RemoveUnusedWhile, RenameVariables, Rule, bundle::BundleRequireMode}};
+use darklua_core::{BundleConfiguration, Configuration, Options, Resources, rules::{ComputeExpression, FilterAfterEarlyReturn, GroupLocalAssignment, PathRequireMode, RemoveComments, RemoveEmptyDo, RemoveIfExpression, RemoveNilDeclaration, RemoveSpaces, RemoveTypes, RemoveUnusedVariable, RemoveUnusedWhile, RenameVariables, Rule, bundle::BundleRequireMode}};
 use flate2::{Compression, write::DeflateEncoder};
+use lazy_regex::regex_replace_all;
 use parking_lot::RwLock;
 
 use crate::{rules::prefix_requires::PrefixRequireRule, structs::{DataSync, Directory, File, Project, ProjectItem, ProjectItemType, RequestType}};
@@ -241,23 +242,10 @@ pub fn merge(batch: Vec<RequestType>) -> Vec<RequestType> {
 pub fn process_file(file: &PathBuf, root: &PathBuf, item_type: ProjectItemType, minify: bool, deflate: bool, bundle: bool, require_prefix: Option<String>, prefix_exclusions: Option<Vec<String>>) -> String {
 	let file_bytes = std::fs::read(file).unwrap();
 	let mut content = String::from_utf8(file_bytes).unwrap();
-	// replace continues (for tstl output)
-	// most cc code likely won't have this anyway
-	// but it's unfortunately required because darklua's parser doesn't support goto & labels
-	content = content
-		.replace("::__continue", "-- ::__continue")
-		.replace("goto __continue", "continue -- goto __continue");
-	{
-		let rule: Box<dyn Rule> = Box::new(RemoveContinue::default());
-		let cfg = Configuration::empty()
-			.with_rule(rule);
-		let resources = Resources::from_memory();
-		resources.write(file.file_name().unwrap(), &content).unwrap();
-		darklua_core::process(&resources, Options::new(Path::new(file.file_name().unwrap())).with_configuration(cfg)).unwrap().result().unwrap();
-		content = resources.get(Path::new(file.file_name().unwrap())).unwrap();
-	}
 	if item_type != ProjectItemType::Resource {
 		if let Some(pfx) = require_prefix.clone() {
+			// manually comment out gotos so darklua's parser doesnt screw up
+			comment_gotos(&mut content);
 			let mut base_exclude = vec!["cc.audio.dfpwm".to_string(), "cc.completion".to_string(), "cc.expect".to_string(), "cc.image.nft".to_string(), "cc.pretty".to_string(), "cc.require".to_string(), "cc.shell.completion".to_string(), "cc.strings".to_string()];
 			if let Some(mut exc) = prefix_exclusions.clone() {
 				base_exclude.append(&mut exc);
@@ -272,8 +260,12 @@ pub fn process_file(file: &PathBuf, root: &PathBuf, item_type: ProjectItemType, 
 			resources.write(file.file_name().unwrap(), &content).unwrap();
 			darklua_core::process(&resources, Options::new(Path::new(file.file_name().unwrap())).with_configuration(cfg)).unwrap().result().unwrap();
 			content = resources.get(Path::new(file.file_name().unwrap())).unwrap();
+			// manually uncomment the commented gotos (hopefully keeping everything functional)
+			uncomment_gotos(&mut content);
 		}
 		if bundle {
+			// manually comment out gotos so darklua's parser doesnt screw up
+			comment_gotos(&mut content);
 			let mut cfg = Configuration::empty();
 			let resources = Resources::from_memory();
 				cfg = cfg.with_bundle_configuration(
@@ -327,13 +319,20 @@ pub fn process_file(file: &PathBuf, root: &PathBuf, item_type: ProjectItemType, 
 			resources.write(file.file_name().unwrap(), &content).unwrap();
 			darklua_core::process(&resources, Options::new(Path::new(file.file_name().unwrap())).with_configuration(cfg)).unwrap().result().unwrap();
 			content = resources.get(Path::new(file.file_name().unwrap())).unwrap();
+			// manually uncomment the commented gotos (hopefully keeping everything functional)
+			uncomment_gotos(&mut content);
 		}
 		if minify {
+			// manually comment out gotos so darklua's parser doesnt screw up
+			comment_gotos(&mut content);
+			println!("new content is {}", content);
 			let cfg = get_darklua_cfg();
 			let resources = Resources::from_memory();
 			resources.write(file.file_name().unwrap(), &content).unwrap();
 			darklua_core::process(&resources, Options::new(Path::new(file.file_name().unwrap())).with_configuration(cfg)).unwrap().result().unwrap();
 			content = resources.get(Path::new(file.file_name().unwrap())).unwrap();
+			// manually uncomment the commented gotos (hopefully keeping everything functional)
+			uncomment_gotos(&mut content);
 		}
 	}
 	if deflate {
@@ -606,6 +605,20 @@ pub fn process_tup(tup: Option<(Option<Directory>, Option<File>, ProjectItem)>, 
 	}
 }
 
+fn comment_gotos(file_content: &mut String) {
+	let goto_replaced = regex_replace_all!("goto (?<label_name>.+)", file_content, |_, label_name| format!("--autocommentedgoto {}", label_name));
+	let label_replaced = regex_replace_all!("::(?<label_name>.+)::", &goto_replaced, |_, label_name| format!("--autocommented::{}::", label_name));
+	let res = label_replaced.to_string();
+	*file_content = res;
+}
+
+fn uncomment_gotos(file_content: &mut String) {
+	let goto_replaced = regex_replace_all!("--autocommentedgoto (?<label_name>.+)", file_content, |_, label_name| format!(" goto {} ", label_name));
+	let label_replaced = regex_replace_all!("--autocommented::(?<label_name>.+)::", &goto_replaced, |_, label_name| format!(" ::{}:: ", label_name));
+	let res = label_replaced.to_string();
+	*file_content = res;
+}
+
 pub fn get_darklua_cfg() -> Configuration {
 	let red: Box<dyn Rule> = Box::new(RemoveEmptyDo::default());
 	let ce: Box<dyn Rule> = Box::new(ComputeExpression::default());
@@ -617,7 +630,7 @@ pub fn get_darklua_cfg() -> Configuration {
 	let rv: Box<dyn Rule> = Box::new(RenameVariables::default().with_function_names());
 	let rif: Box<dyn Rule> = Box::new(RemoveIfExpression::default());
 	let gla: Box<dyn Rule> = Box::new(GroupLocalAssignment::default());
-	let rc: Box<dyn Rule> = Box::new(RemoveComments::default());
+	let rc: Box<dyn Rule> = Box::new(RemoveComments::default().with_exception("--autocommented"));
 	let rt: Box<dyn Rule> = Box::new(RemoveTypes::default());
 	Configuration::empty()
 		.with_rule(faer)
@@ -632,5 +645,4 @@ pub fn get_darklua_cfg() -> Configuration {
 		.with_rule(rv)
 		.with_rule(gla)
 		.with_rule(rif)
-		.with_generator(darklua_core::GeneratorParameters::Dense { column_span: usize::MAX })
 }
