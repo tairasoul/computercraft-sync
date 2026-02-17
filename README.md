@@ -11,6 +11,8 @@ ohkami also seems to be a little weird with the websockets and waiting for them 
 
 minify also currently does not use darklua's Dense generator as it removes comments and comments have to be kept in order to keep goto's without the parser erroring
 
+bundling is heavily buggy with cc-style requires, a custom rule needs to be made for that still
+
 ## usage
 
 in order to use this, download the binary from Releases, put it in a project folder (`project.ron` should be at the root), and run it
