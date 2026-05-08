@@ -95,37 +95,82 @@ pub struct Project {
 #[derive(PartialEq, Eq)]
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct DataSync {
-	#[serde(rename = "filePath")]
+	#[serde(rename = "fp")]
 	pub file_path: String,
-	#[serde(rename = "fileData")]
+	#[serde(rename = "fd")]
 	pub file_data: String
+}
+
+impl Into<Vec<u8>> for RequestType {
+	fn into(self) -> Vec<u8> {
+		match self {
+			Self::Library { data } => Self::vec_from_fsync(data),
+			Self::Resource { data } => Self::vec_from_fsync(data),
+			Self::Script { data } => Self::vec_from_fsync(data),
+			Self::Deletion { files } => Self::vec_from_del(files),
+			Self::Chunk { file_data } => Self::vec_from_chunk(file_data)
+		}
+	}
+}
+
+impl RequestType {
+	fn vec_from_fsync(data: DataSync) -> Vec<u8> {
+		let mut v = Vec::new();
+		v.push(0);
+		let fp_len = (data.file_path.len() as u32).to_be_bytes();
+		let fd_len = (data.file_data.len() as u32).to_be_bytes();
+		v.extend_from_slice(&fp_len);
+		v.extend_from_slice(&fd_len);
+		v.extend_from_slice(data.file_path.as_bytes());
+		v.extend_from_slice(data.file_data.as_bytes());
+		v
+	}
+
+	fn vec_from_del(files: Vec<String>) -> Vec<u8> {
+		let mut v = Vec::new();
+		v.push(1);
+		let v_len = (files.len() as u32).to_be_bytes();
+		v.extend_from_slice(&v_len);
+		for file in &files {
+			let str_len = (file.len() as u32).to_be_bytes();
+			v.extend_from_slice(&str_len);
+			v.extend_from_slice(file.as_bytes());
+		}
+		v
+	}
+
+	fn vec_from_chunk(chunk: String) -> Vec<u8> {
+		let mut v = Vec::new();
+		v.push(2);
+		let str_len = (chunk.len() as u32).to_be_bytes();
+		v.extend_from_slice(&str_len);
+		v.extend_from_slice(chunk.as_bytes());
+		v
+	}
 }
 
 #[derive(PartialEq, Eq)]
 #[derive(Deserialize, Serialize, Clone, Debug)]
-#[serde(tag = "type")]
+#[serde(untagged)]
 pub enum RequestType {
-	#[serde(rename = "r")]
 	Resource { 
 		#[serde(flatten)]
 		data: DataSync
 	},
-	#[serde(rename = "l")]
 	Library { 
 		#[serde(flatten)]
 		data: DataSync 
 	},
-	#[serde(rename = "s")]
 	Script { 
 		#[serde(flatten)]
 		data: DataSync 
 	},
-	#[serde(rename = "d")]
 	Deletion { 
+		#[serde(rename = "f")]
 		files: Vec<String> 
 	},
-	#[serde(rename = "c")]
 	Chunk { 
+		#[serde(rename = "fd")]
 		file_data: String
 	}
 }

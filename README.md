@@ -17,7 +17,7 @@ bundling is heavily buggy with cc-style requires, a custom rule needs to be made
 
 in order to use this, download the binary from Releases, put it in a project folder (`project.ron` should be at the root), and run it
 
-then, in cc, run `wget run http://url-to-server:port/download` to download everything needed (port is optional if it's just a DNS record)
+then, in cc, run `wget run http://url-to-server:port/download` to download everything needed (port is optional if it's just a DNS record pointing at the port)
 
 ngrok tcp tunnels can be used for this
 
@@ -184,7 +184,6 @@ lua/libdeflate.lua is altered to remove WoW related functions, cli, internals an
 
 original license follows
 
-
 <details><summary>lua/libdeflate.lua LICENSE (click to view)</summary>
 zlib License
 
@@ -237,33 +236,4 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-</details>
-
-[`lua/msgpack.lua`](https://github.com/kieselsteini/msgpack/blob/master/msgpack.lua) is licensed under the Unlicense, original license follows
-
-<details><summary>lua/msgpack LICENSE (click to view)</summary>
-This is free and unencumbered software released into the public domain.
-
-Anyone is free to copy, modify, publish, use, compile, sell, or
-distribute this software, either in source code form or as a compiled
-binary, for any purpose, commercial or non-commercial, and by any
-means.
-
-In jurisdictions that recognize copyright laws, the author or authors
-of this software dedicate any and all copyright interest in the
-software to the public domain. We make this dedication for the benefit
-of the public at large and to the detriment of our heirs and
-successors. We intend this dedication to be an overt act of
-relinquishment in perpetuity of all present and future rights to this
-software under copyright law.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-
-For more information, please refer to <http://unlicense.org/>
 </details>

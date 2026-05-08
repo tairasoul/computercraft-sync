@@ -49,12 +49,19 @@ pub async fn handle_subscribe(
 			let mut lock = conn_arc.lock().await;
 			for chunk in chunked {
 				let byte_vec = {
-					let mpd = rmp_serde::encode::to_vec(&chunk).unwrap();
+					let bytes = {
+						let mut v = Vec::new();
+						for req in chunk {
+							v.extend_from_slice(&<RequestType as Into<Vec<u8>>>::into(req));
+						}
+						v
+					};
 					let mut deflate = DeflateEncoder::new(vec![], Compression::best());
-					deflate.write_all(&mpd).unwrap();
+					deflate.write_all(&bytes).unwrap();
 					deflate.finish().unwrap()
 				};
 				lock.send(Message::Binary(byte_vec)).await.unwrap();
+				lock.flush().await.unwrap();
 			}
 		}
 		let mut interval = interval(Duration::from_secs(sync_interval));
@@ -107,9 +114,15 @@ pub async fn handle_subscribe(
 						let mut lock = conn_arc.lock().await;
 						for chunk in chunked {
 							let byte_vec = {
-								let mpd = rmp_serde::encode::to_vec(&chunk).unwrap();
+								let bytes = {
+									let mut v = Vec::new();
+									for req in chunk {
+										v.extend_from_slice(&<RequestType as Into<Vec<u8>>>::into(req));
+									}
+									v
+								};
 								let mut deflate = DeflateEncoder::new(vec![], Compression::best());
-								deflate.write_all(&mpd).unwrap();
+								deflate.write_all(&bytes).unwrap();
 								deflate.finish().unwrap()
 							};
 							lock.send(Message::Binary(byte_vec)).await.unwrap();

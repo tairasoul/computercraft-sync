@@ -3,7 +3,7 @@ use std::env::current_dir;
 use ron::Options;
 use tokio::runtime::Builder;
 
-use crate::{server::server::SyncServer, structs::Project};
+use crate::{server::SyncServer, structs::Project};
 
 mod files;
 mod server;
@@ -28,16 +28,22 @@ async fn main_fn() {
 
 	let root_dir = cd.join(&project.root_dir);
 
+	let mut early_exit = false;
+
 	if !std::fs::exists(&root_dir).unwrap() {
 		println!("could not find {} relative to current directory", root_dir.to_string_lossy());
-		return;
+		early_exit = true;
 	}
 
 	for item in &project.items {
 		if item.channel_name.contains(char::is_whitespace) {
 			println!("channel name \"{}\" contains whitespace, remove any whitespace present", item.channel_name);
-			return;
+			early_exit = true;
 		}
+	}
+
+	if early_exit {
+		return;
 	}
 
 	let server = SyncServer::new(project);

@@ -55,15 +55,10 @@ impl Prefixer {
 						}
 						let func = FunctionCall::new(fc.get_prefix().clone(), new_args, None);
 						let ec = Expression::Call(Box::new(func));
-						Some(ec)
-					}
-					else {
-						None
+						return Some(ec);
 					}
 				}
-				else {
-					None
-				}
+				return None;
 			}
 			_ => None
 		}
@@ -72,7 +67,7 @@ impl Prefixer {
 
 impl NodeProcessor for Prefixer {
 	fn process_expression(&mut self, expr: &mut Expression) {
-		if let Some(replace) = self.replace_with(expr) {
+		if !self.prefix.is_empty() && let Some(replace) = self.replace_with(expr) {
 			*expr = replace;
 		}
 	}

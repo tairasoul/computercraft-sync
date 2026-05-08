@@ -117,9 +117,8 @@ fn main() {
 		resources.get(Path::new("src/lz4.lua")).unwrap()
 	};
 
-	let sync_bundled = {
+	let sync_content = {
 		let resources = Resources::from_memory();
-		resources.write("src/msgpack.lua", &String::from_utf8(std::fs::read("./lua/msgpack.lua").unwrap()).unwrap()).unwrap();
 		resources.write("src/sync.lua", &String::from_utf8(std::fs::read("./lua/sync.lua").unwrap()).unwrap()).unwrap();
 		let red: Box<dyn Rule> = Box::new(RemoveEmptyDo::default());
 		let faer: Box<dyn Rule> = Box::new(FilterAfterEarlyReturn::default());
@@ -157,9 +156,8 @@ fn main() {
 		resources.get(Path::new("src/sync.lua")).unwrap()
 	};
 
-	let sync_bundled_nomin = {
+	let sync_content_nomin = {
 		let resources = Resources::from_memory();
-		resources.write("src/msgpack.lua", &String::from_utf8(std::fs::read("./lua/msgpack.lua").unwrap()).unwrap()).unwrap();
 		resources.write("src/sync.lua", &String::from_utf8(std::fs::read("./lua/sync.lua").unwrap()).unwrap()).unwrap();
 		let rt: Box<dyn Rule> = Box::new(RemoveTypes::default());
 		let config = Configuration::empty()
@@ -180,9 +178,9 @@ fn main() {
 	let b85 = out_dir.join("b85.min.lua");
 	let libdeflate = out_dir.join("libdeflate.min.lua");
 	let lz4 = out_dir.join("lz4.min.lua");
-	std::fs::write(&sync, sync_bundled).unwrap();
+	std::fs::write(&sync, sync_content).unwrap();
 	std::fs::write(&libdeflate, libd_minified).unwrap();
-	std::fs::write(&sync_nomin, sync_bundled_nomin).unwrap();
+	std::fs::write(&sync_nomin, sync_content_nomin).unwrap();
 	std::fs::write(&b85, b85_minified).unwrap();
 	std::fs::write(&lz4, lz4_minified).unwrap();
 }

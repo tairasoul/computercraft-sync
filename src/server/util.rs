@@ -21,9 +21,7 @@ impl FileBatcher {
 	}
 
 	pub fn retrieve_batch(&mut self) -> Vec<RequestType> {
-		let currently_existing = self.currently_in.clone();
-		self.currently_in.clear();
-		currently_existing
+		std::mem::take(&mut self.currently_in)
 	}
 }
 
@@ -211,6 +209,7 @@ pub fn chunk_batch(batch: Vec<RequestType>, max_uncompressed_request_size: usize
 	if current_set.len() > 0 {
 		res.push(current_set);
 	}
+	// println!("{res:#?}");
 	res
 }
 
@@ -268,54 +267,54 @@ pub fn process_file(file: &PathBuf, root: &PathBuf, item_type: ProjectItemType, 
 			comment_gotos(&mut content);
 			let mut cfg = Configuration::empty();
 			let resources = Resources::from_memory();
-				cfg = cfg.with_bundle_configuration(
-					BundleConfiguration::new(
-						BundleRequireMode::Path(
-							PathRequireMode::new("")
-						)
+			cfg = cfg.with_bundle_configuration(
+				BundleConfiguration::new(
+					BundleRequireMode::Path(
+						PathRequireMode::new("")
 					)
-					.with_exclude("cc.audio.dfpwm")
-					.with_exclude("cc.completion")
-					.with_exclude("cc.expect")
-					.with_exclude("cc.image.nft")
-					.with_exclude("cc.pretty")
-					.with_exclude("cc.require")
-					.with_exclude("cc.shell.completion")
-					.with_exclude("cc.strings")
-				);
-				for file in walkdir::WalkDir::new(root) {
-					if let Ok(entry) = file {
-						if let Ok(metadata) = entry.metadata() {
-							if metadata.is_file() {
-								let path = entry.into_path();
-								let relative_to_root = path.strip_prefix(root).unwrap();
-								let str = relative_to_root.to_string_lossy().to_string().replace("/", ".");
-								if let Some(pfx) = require_prefix.clone() {
-									let file_content = String::from_utf8(std::fs::read(&path).unwrap()).unwrap();
-									let mut base_exclude = vec!["cc.audio.dfpwm".to_string(), "cc.completion".to_string(), "cc.expect".to_string(), "cc.image.nft".to_string(), "cc.pretty".to_string(), "cc.require".to_string(), "cc.shell.completion".to_string(), "cc.strings".to_string()];
-									if let Some(mut exc) = prefix_exclusions.clone() {
-										base_exclude.append(&mut exc);
-									}
-									let rule: Box<dyn Rule> = Box::new(PrefixRequireRule::new(
-										pfx.clone(), 
-										base_exclude
-									));
-									let cfg = Configuration::empty()
-										.with_rule(rule);
-									let res = Resources::from_memory();
-									res.write(path.file_name().unwrap(), &file_content
-									.replace("::__continue", "-- ::__continue")
-									.replace("goto __continue", "continue -- goto __continue")).unwrap();
-									darklua_core::process(&res, Options::new(Path::new(path.file_name().unwrap())).with_configuration(cfg)).unwrap().result().unwrap();
-									resources.write(pfx + &str, &res.get(Path::new(path.file_name().unwrap())).unwrap()).unwrap();
+				)
+				.with_exclude("cc.audio.dfpwm")
+				.with_exclude("cc.completion")
+				.with_exclude("cc.expect")
+				.with_exclude("cc.image.nft")
+				.with_exclude("cc.pretty")
+				.with_exclude("cc.require")
+				.with_exclude("cc.shell.completion")
+				.with_exclude("cc.strings")
+			);
+			for file in walkdir::WalkDir::new(root) {
+				if let Ok(entry) = file {
+					if let Ok(metadata) = entry.metadata() {
+						if metadata.is_file() {
+							let path = entry.into_path();
+							let relative_to_root = path.strip_prefix(root).unwrap();
+							let str = relative_to_root.to_string_lossy().to_string().replace("/", ".");
+							if let Some(pfx) = require_prefix.clone() {
+								let file_content = String::from_utf8(std::fs::read(&path).unwrap()).unwrap();
+								let mut base_exclude = vec!["cc.audio.dfpwm".to_string(), "cc.completion".to_string(), "cc.expect".to_string(), "cc.image.nft".to_string(), "cc.pretty".to_string(), "cc.require".to_string(), "cc.shell.completion".to_string(), "cc.strings".to_string()];
+								if let Some(mut exc) = prefix_exclusions.clone() {
+									base_exclude.append(&mut exc);
 								}
-								else {
-									resources.write(&str, &String::from_utf8(std::fs::read(&path).unwrap()).unwrap()).unwrap();
-								}
+								let rule: Box<dyn Rule> = Box::new(PrefixRequireRule::new(
+									pfx.clone(), 
+									base_exclude
+								));
+								let cfg = Configuration::empty()
+									.with_rule(rule);
+								let res = Resources::from_memory();
+								res.write(path.file_name().unwrap(), &file_content
+								.replace("::__continue", "-- ::__continue")
+								.replace("goto __continue", "continue -- goto __continue")).unwrap();
+								darklua_core::process(&res, Options::new(Path::new(path.file_name().unwrap())).with_configuration(cfg)).unwrap().result().unwrap();
+								resources.write(pfx + &str, &res.get(Path::new(path.file_name().unwrap())).unwrap()).unwrap();
+							}
+							else {
+								resources.write(&str, &String::from_utf8(std::fs::read(&path).unwrap()).unwrap()).unwrap();
 							}
 						}
 					}
 				}
+			}
 			resources.write(file.file_name().unwrap(), &content).unwrap();
 			darklua_core::process(&resources, Options::new(Path::new(file.file_name().unwrap())).with_configuration(cfg)).unwrap().result().unwrap();
 			content = resources.get(Path::new(file.file_name().unwrap())).unwrap();
